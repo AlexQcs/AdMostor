@@ -6,5 +6,5 @@ package com.hc.admc.request;
  */
 
 public class Api {
-    public static final String BASE_URL = "http://192.168.0.90:8080/";
+    public static final String BASE_URL = "http://192.168.0.35:8080/";
 }

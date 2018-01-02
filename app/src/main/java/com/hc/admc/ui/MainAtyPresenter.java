@@ -39,10 +39,12 @@ import rx.Observable;
 import rx.Subscriber;
 import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
+import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
 import static android.os.Looper.getMainLooper;
+import static anet.channel.util.Utils.context;
 
 /**
  * Created by Alex on 2017/12/8.
@@ -58,13 +60,18 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
     }
 
     private Subscription mProgramSubscription;//播放节目单读秒器
+    private Subscription mRigisterSubscription;
     private List<ProgramBean.ProgramListBean> mProgramListBeens;//播放节目单列表
     private int mProgramListBeenIdx = 0;//记录在播放时间内的下标
 
     private MyApplication mApplication = MyApplication.getInstance();
     private static ApiService apiService = Http.getApiService();
 
-    private boolean mRegistered = false;
+    private boolean mRegistered = true;
+
+    private PushAgent mPushAgent;
+
+//    private volatile String mDeviceToken;
 
     /**
      * 作用:初始化友盟自定义消息
@@ -72,52 +79,67 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
      * @param context
      *         mainactivity的context
      */
-    public void init(Context context) {
+    public void init() {
         //时间同步
         syncTime();
         //获取sp
         getShareprefrence();
         //初始化友盟
-        PushAgent mPushAgent = PushAgent.getInstance(context);
-        UmengMessageHandler messageHandler = new UmengMessageHandler() {
-            @Override
-            public void dealWithCustomMessage(final Context context, final UMessage msg) {
-                new Handler(getMainLooper()).post(new Runnable() {
-                    @Override
-                    public void run() {
-                        // 对于自定义消息，PushSDK默认只统计送达。若开发者需要统计点击和忽略，则需手动调用统计方法。
-                        Log.i("友盟消息", msg.custom);
-                        getMvpView().receiveUmengMsg(msg.custom);
-                        Gson gson = new Gson();
-                        UMengBean uMeng = gson.fromJson(msg.custom, UMengBean.class);
-                        Log.e("友盟消息解析", uMeng.toString());
-                        Toast.makeText(context, msg.custom, Toast.LENGTH_LONG).show();
-                        switch (uMeng.getCode()) {
-                            case 10003:
-                                Map<String,String> data=uMeng.getData();
-                                String url=data.get("url");
-                                String id=data.get("taskId");
-                                requestProgram(url,id);
-                                break;
-                        }
-                    }
-                });
-            }
-        };
-        mPushAgent.setMessageHandler(messageHandler);
-        String deviceToken = mPushAgent.getRegistrationId();
-        SpUtils.put(Constant.DEVICE_TOKEN, deviceToken);
+
+
         //注册消息
         if (!mRegistered) {
-            registDevice(deviceToken);
+            mRigisterSubscription = Observable.interval(10, TimeUnit.SECONDS)
+                    .subscribeOn(Schedulers.io())
+                    .subscribe(new Action1<Long>() {
+                        @Override
+                        public void call(Long aLong) {
+                            if (mRegistered) {
+                                mRigisterSubscription.unsubscribe();
+                            } else {
+                                mPushAgent = PushAgent.getInstance(MyApplication.getContext());
+
+                                UmengMessageHandler messageHandler = new UmengMessageHandler() {
+                                    @Override
+                                    public void dealWithCustomMessage(final Context context, final UMessage msg) {
+                                        new Handler(getMainLooper()).post(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                // 对于自定义消息，PushSDK默认只统计送达。若开发者需要统计点击和忽略，则需手动调用统计方法。
+                                                Log.i("友盟消息", msg.custom);
+                                                getMvpView().receiveUmengMsg(msg.custom);
+                                                Gson gson = new Gson();
+                                                UMengBean uMeng = gson.fromJson(msg.custom, UMengBean.class);
+                                                Log.e("友盟消息解析", uMeng.toString());
+                                                Toast.makeText(context, msg.custom, Toast.LENGTH_LONG).show();
+                                                switch (uMeng.getCode()) {
+                                                    case 10003:
+                                                        Map<String, String> data = uMeng.getData();
+                                                        String url = data.get("url");
+                                                        String id = data.get("taskId");
+                                                        requestProgram(url, id);
+                                                        break;
+                                                }
+                                            }
+                                        });
+                                    }
+                                };
+                                mPushAgent.setMessageHandler(messageHandler);
+                                String mDeviceToken = mPushAgent.getRegistrationId();
+                                SpUtils.put(Constant.DEVICE_TOKEN, mDeviceToken);
+                                registDevice(mDeviceToken);
+                            }
+                        }
+                    });
+
         }
-        String programStr=FileUtils.getStringFromTxT(Constant.LOCAL_PROGRAM_LIST_PATH);
-        ProgramBean programBean=new ProgramBean();
-        if (programStr.equals("")){
-            Log.e(TAG,"未找到节目单");
-        }else {
-            Gson gson=new Gson();
-             programBean=gson.fromJson(programStr,ProgramBean.class);
+        String programStr = FileUtils.getStringFromTxT(Constant.LOCAL_PROGRAM_LIST_PATH);
+        ProgramBean programBean = new ProgramBean();
+        if (programStr.equals("")) {
+            Log.e(TAG, "未找到节目单");
+        } else {
+            Gson gson = new Gson();
+            programBean = gson.fromJson(programStr, ProgramBean.class);
         }
 
         playProgram(programBean.getProgramList());
@@ -139,10 +161,11 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         mMainAtyMode.regist(signature, time_s, token, deviceid, device_token, new Callback<RegistBean>() {
             @Override
             public void onResponse(Call<RegistBean> call, Response<RegistBean> response) {
-                RegistBean registBean = response.body();
-                if ("注册成功".equals(registBean.getMsg())){
-                    mRegistered=true;
 
+                RegistBean registBean = response.body();
+                if (registBean == null) return;
+                if ("注册成功".equals(registBean.getMsg())) {
+                    mRegistered = true;
                 }
                 Log.e(TAG, registBean.getMsg());
             }
@@ -160,7 +183,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
                 try {
-                    String date = response.body().string().replace("\"","");
+                    String date = response.body().string().replace("\"", "");
                     DateFormatUtils.syncTime(date);
                     Log.e(TAG, "时间同步" + date);
                 } catch (IOException e) {
@@ -177,7 +200,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         });
     }
 
-    private void requestProgram(String url,String taskId){
+    private void requestProgram(String url, String taskId) {
         String timestamp = System.currentTimeMillis() + "";
         String token = Constant.TOKEN;
         String signature = StringUtils.getSignature(timestamp, token);
@@ -250,7 +273,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
                         final String path = tempArray[tempArray.length - 2] + File.separator + tempArray[tempArray.length - 1];
                         final File file = new File(Constant.LOCAL_PROGRAM_PATH + File.separator + path);
-                        if (file.exists())return;
+                        if (file.exists()) return;
                         apiService.downloadFile(url)
                                 .subscribeOn(Schedulers.io())
                                 .subscribe(new CommonSubscriber<ResponseBody>(MyApplication.getContext()) {
@@ -378,6 +401,11 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         }
     }
 
+    public void destrory() {
+        unsubscribeSub(mProgramSubscription);
+        unsubscribeSub(mRigisterSubscription);
+    }
+
     private boolean isTiming(Date date, ProgramBean.ProgramListBean.TimingBean timingBean) {
 
 //        //1.判断当前日期是否在规定时间内
@@ -398,9 +426,9 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 //        Date endClock = DateFormatUtils.string2Date(endClockStr, "yyyy-MM-dd");
 //        boolean isInClock = DateFormatUtils.belongCalendar(curClock, beginClock, endClock);
 
-        String beginDateStr = timingBean.getBeginDate()+" "+timingBean.getBeginTime();
+        String beginDateStr = timingBean.getBeginDate() + " " + timingBean.getBeginTime();
         Date beginDate = DateFormatUtils.string2Date(beginDateStr, "yyyy-MM-dd HH:mm:ss");
-        String endDateStr = timingBean.getEndDate()+" "+timingBean.getEndTime();
+        String endDateStr = timingBean.getEndDate() + " " + timingBean.getEndTime();
         Date endDate = DateFormatUtils.string2Date(endDateStr, "yyyy-MM-dd HH:mm:ss");
         boolean isInDate = DateFormatUtils.belongCalendar(date, beginDate, endDate);
 
@@ -420,10 +448,9 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         mRegistered = (boolean) SpUtils.get(Constant.REGISTERED, false);
     }
 
-    private void saveShareprefrence(){
-        SpUtils.put(Constant.REGISTERED,true);
+    private void saveShareprefrence() {
+        SpUtils.put(Constant.REGISTERED, true);
     }
-
 
 
 }

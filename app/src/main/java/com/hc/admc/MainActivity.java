@@ -137,7 +137,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     }
 
     void initEvent() {
-        getMvpPresenter().init(this);
+        getMvpPresenter().init();
     }
 
     @Override
@@ -241,6 +241,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
             }
         }
     }
+
 
     private void playVideo(final ArrayList<String> pathList, final String itemid, final int childViewIndex) {
 //        final CustomVideoView videoView = (CustomVideoView) mAtyLayout.getChildAt(childViewIndex);
@@ -376,7 +377,9 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         Message message = new Message();
         message.what = 1;
         mImageHandler.sendMessage(message);
+        getMvpPresenter().destrory();
         MainActivity.this.finish();
+        System.exit(0);
     }
 
     @Override
@@ -386,7 +389,9 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         Message message = new Message();
         message.what = 1;
         mImageHandler.sendMessage(message);
+        getMvpPresenter().destrory();
         MainActivity.this.finish();
+        System.exit(0);
     }
 
 
