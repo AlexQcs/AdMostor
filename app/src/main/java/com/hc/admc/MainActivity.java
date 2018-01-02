@@ -234,6 +234,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                             mImageHandler.sendMessage(message);
                             break;
                         case "web":
+
                             break;
                     }
                 }
