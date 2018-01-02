@@ -1,4 +1,4 @@
-package com.hc.admostor;
+package com.hc.admc;
 
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;

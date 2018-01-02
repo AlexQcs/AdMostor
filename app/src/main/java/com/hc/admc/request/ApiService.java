@@ -1,10 +1,14 @@
 package com.hc.admc.request;
 
-import com.hc.admc.bean.ProgramBean;
+import com.hc.admc.bean.program.ProgramBean;
+import com.hc.admc.bean.program.RegistBean;
 
+import okhttp3.ResponseBody;
 import retrofit2.Call;
-import retrofit2.http.POST;
-import retrofit2.http.Path;
+import retrofit2.http.GET;
+import retrofit2.http.Query;
+import retrofit2.http.Url;
+import rx.Observable;
 
 /**
  * Created by Alex on 2017/12/8.
@@ -12,6 +16,15 @@ import retrofit2.http.Path;
  */
 
 public interface ApiService {
+
+
+    @GET("/api/register.do")
+    Call<RegistBean> registToService(@Query("signature") String signature,
+                                     @Query("timestamp") String timestamp,
+                                     @Query("token") String token,
+                                     @Query("deviceId")String deviceId,
+                                     @Query("deviceToken")String deviceToken);
+
     /**
      * 作用:请求获取节目单信息
      *
@@ -23,6 +36,22 @@ public interface ApiService {
      *         根据 时间戳 与 token 加密生成的签名
      * @return Call<ProgramBean>
      */
-    @POST("4156")
-    Call<ProgramBean> requestProgram(@Path("timestamp") String timestamp, @Path("token") String token, @Path("signature") String signature);
+    @GET
+    Call<ProgramBean> requestProgram(@Url String url,
+            @Query("signature") String signature,
+                                     @Query("timestamp") String timestamp,
+                                     @Query("token") String token,
+                                     @Query("taskId")String taskId
+                                     );
+
+    @GET
+    Observable<ResponseBody> downloadFile(@Url String fileUrl);
+
+    @GET("/api/get_now_time.do")
+    Call<ResponseBody> sysncTime();
+
+    @GET("/api/sync_finish.do")
+    Call<ResponseBody> sysncFinish(@Query("terminalId")String mac);
+
+
 }

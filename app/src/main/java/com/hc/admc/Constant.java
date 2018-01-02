@@ -2,6 +2,8 @@ package com.hc.admc;
 
 import android.os.Environment;
 
+import com.hc.admc.util.MACUtils;
+
 /**
  * Created by Alex on 2017/12/9.
  * 备注:
@@ -28,4 +30,12 @@ public class Constant {
     public static final String LOCAL_PROGRAM_CFG_PATH = LOCAL_FILE_PATH + "/programCfg";
     //播放节目单
     public static final String LOCAL_PROGRAM_LIST_PATH = LOCAL_PROGRAM_CFG_PATH + "/program.txt";
+
+    public static final String MAC= MACUtils.mac();
+
+    public static final String TOKEN="test";
+
+    //SharedPreferences
+    public static final String DEVICE_TOKEN="device_token";
+    public static final String REGISTERED="registered";
 }

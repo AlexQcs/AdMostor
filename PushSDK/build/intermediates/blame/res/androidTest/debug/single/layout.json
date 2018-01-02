@@ -2,5 +2,9 @@
     {
         "merged": "D:\\AndroidWorkspace\\AdMostor\\PushSDK\\build\\intermediates\\res\\merged\\androidTest\\debug\\layout\\upush_notification.xml",
         "source": "D:\\AndroidWorkspace\\AdMostor\\PushSDK\\build\\intermediates\\bundles\\debug\\res\\layout\\upush_notification.xml"
+    },
+    {
+        "merged": "D:\\AndroidWorkspace\\ADMC\\PushSDK\\build\\intermediates\\res\\merged\\androidTest\\debug\\layout\\upush_notification.xml",
+        "source": "D:\\AndroidWorkspace\\ADMC\\PushSDK\\build\\intermediates\\bundles\\debug\\res\\layout\\upush_notification.xml"
     }
 ]

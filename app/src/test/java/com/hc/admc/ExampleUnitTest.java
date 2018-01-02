@@ -1,4 +1,4 @@
-package com.hc.admostor;
+package com.hc.admc;
 
 import org.junit.Test;
 

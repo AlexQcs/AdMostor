@@ -1,11 +1,22 @@
 package com.hc.admc.util;
 
+import android.util.Log;
+
 import com.hc.admc.Constant;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+
+import okhttp3.ResponseBody;
 
 /**
  * Created by Alex on 2017/12/9.
@@ -91,5 +102,67 @@ public class FileUtils {
             e.printStackTrace();
         }
 
+    }
+
+    public static void downloadFile(ResponseBody body, File file) {
+        long currentLength = 0;
+        OutputStream os = null;
+        InputStream is = body.byteStream();
+//        long totalLength =response.body().contentLength();
+        try {
+            os = new FileOutputStream(file);
+            int len;
+            byte[] buff = new byte[1024];
+
+            while ((len = is.read(buff)) != -1) {
+                os.write(buff, 0, len);
+                currentLength += len;
+                Log.e("vivi", "当前进度:" + currentLength);
+            }
+            // httpCallBack.onLoading(currentLength,totalLength,true);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (os != null) {
+                try {
+                    os.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+    }
+
+
+    //读取txt文件内容
+    public static String getStringFromTxT(String path) {
+        String str = "";
+        File urlFile = new File(path);
+        if (!urlFile.exists()){
+            Log.e("FileUtils",path+"不存在！");
+            return str;
+        }
+        InputStreamReader isr = null;
+        try {
+            isr = new InputStreamReader(new FileInputStream(urlFile), "UTF-8");
+            BufferedReader br = new BufferedReader(isr);
+            String mimeTypeLine = null;
+            while ((mimeTypeLine = br.readLine()) != null) {
+                str = str + mimeTypeLine;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return str;
     }
 }

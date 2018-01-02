@@ -1,9 +1,7 @@
 package com.hc.admc.ui;
 
 import com.alex.mvp.view.BaseMvpView;
-import com.hc.admc.bean.ScreenItemBean;
-
-import java.util.List;
+import com.hc.admc.bean.program.ProgramBean;
 
 /**
  * Created by Alex on 2017/12/8.
@@ -12,5 +10,5 @@ import java.util.List;
 
 public interface MainView extends BaseMvpView {
     void receiveUmengMsg(String msg);
-    void layoutProgramView(List<ScreenItemBean> items);
+    void playProgram(ProgramBean.ProgramListBean bean);
 }

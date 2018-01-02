@@ -1,4 +1,4 @@
-package com.hc.admc.bean;
+package com.hc.admc.bean.program;
 
 /**
  * Created by Alex on 2017/12/8.
@@ -6,6 +6,8 @@ package com.hc.admc.bean;
  */
 
 public class ScreenItemBean {
+
+
 
     /**
      * id : video_3_1511748600792 // 节目唯一区块标识
