@@ -4,8 +4,10 @@ import android.util.Log;
 
 import com.hc.admc.bean.program.ProgramBean;
 import com.hc.admc.bean.program.RegistBean;
+import com.hc.admc.bean.program.UMengBean;
 import com.hc.admc.request.Api;
 import com.hc.admc.request.ApiService;
+import com.hc.admc.util.SpUtils;
 
 import okhttp3.OkHttpClient;
 import okhttp3.ResponseBody;
@@ -26,6 +28,7 @@ public class MainAtyMode {
     private Call<ProgramBean> mProgramBeanCall;
     private Call<ResponseBody> mResponseBodyCall;
     private Call<RegistBean> mRegistBeanCall;
+    private Call<UMengBean> mUMengBeanCall;
     private static OkHttpClient client;
 
     public void regist(String signature, String timestamp, String token, String deviceId, String deviceToken, Callback<RegistBean> callback) {
@@ -44,7 +47,7 @@ public class MainAtyMode {
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
 
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(Api.BASE_URL)
+                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(client)
                 .build();
@@ -65,13 +68,33 @@ public class MainAtyMode {
         logging.setLevel(HttpLoggingInterceptor.Level.BODY);
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(Api.BASE_URL)
+                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(client)
                 .build();
         ApiService apiService = retrofit.create(ApiService.class);
         mProgramBeanCall = apiService.requestProgram(url, signature, timestamp, token, taskId);
         mProgramBeanCall.enqueue(callback);
+    }
+
+    public void pollingTask(String signature, String timestamp, String token, String deviceId,Callback<UMengBean> callback){
+        client = new OkHttpClient();
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor(new HttpLoggingInterceptor.Logger() {
+            @Override
+            public void log(String message) {
+                Log.e("syncTime",message);
+            }
+        });
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+        client = new OkHttpClient.Builder().addInterceptor(logging).build();
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .addConverterFactory(GsonConverterFactory.create())
+                .client(client)
+                .build();
+        ApiService apiService = retrofit.create(ApiService.class);
+        mUMengBeanCall = apiService.pollingTask(signature,timestamp,token,deviceId);
+        mUMengBeanCall.enqueue(callback);
     }
 
     public void syncTime(Callback<ResponseBody> callback) {
@@ -85,12 +108,52 @@ public class MainAtyMode {
         logging.setLevel(HttpLoggingInterceptor.Level.BODY);
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(Api.BASE_URL)
+                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(ScalarsConverterFactory.create())
                 .client(client)
                 .build();
         ApiService apiService = retrofit.create(ApiService.class);
         mResponseBodyCall = apiService.sysncTime();
+        mResponseBodyCall.enqueue(callback);
+    }
+
+    public void sysncFinish(String deviceId,Callback<ResponseBody> callback){
+        client = new OkHttpClient();
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor(new HttpLoggingInterceptor.Logger() {
+            @Override
+            public void log(String message) {
+                Log.e("syncTime",message);
+            }
+        });
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+        client = new OkHttpClient.Builder().addInterceptor(logging).build();
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .addConverterFactory(ScalarsConverterFactory.create())
+                .client(client)
+                .build();
+        ApiService apiService = retrofit.create(ApiService.class);
+        mResponseBodyCall = apiService.sysncFinish(deviceId);
+        mResponseBodyCall.enqueue(callback);
+    }
+
+    public void notifyOnLion(String deviceId,Callback<ResponseBody> callback){
+        client = new OkHttpClient();
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor(new HttpLoggingInterceptor.Logger() {
+            @Override
+            public void log(String message) {
+                Log.e("syncTime",message);
+            }
+        });
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+        client = new OkHttpClient.Builder().addInterceptor(logging).build();
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .addConverterFactory(ScalarsConverterFactory.create())
+                .client(client)
+                .build();
+        ApiService apiService = retrofit.create(ApiService.class);
+        mResponseBodyCall = apiService.notifyOnLine(deviceId);
         mResponseBodyCall.enqueue(callback);
     }
 

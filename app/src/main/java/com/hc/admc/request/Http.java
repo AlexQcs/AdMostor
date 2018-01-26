@@ -3,6 +3,7 @@ package com.hc.admc.request;
 import android.util.Log;
 
 import com.hc.admc.application.MyApplication;
+import com.hc.admc.util.SpUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -136,16 +137,6 @@ public class Http {
                     File cacheFile = new File(MyApplication.getContext().getCacheDir(), "cache");
                     Cache cache = new Cache(cacheFile, 1024 * 1024 * 50);//50M的缓存
 
-//                    client = new OkHttpClient
-//                            .Builder()
-//                            .addInterceptor(addQueryParameterInterceptor())  //参数添加
-//                            .addInterceptor(addHeaderInterceptor()) // token过滤
-//                            .addInterceptor(httpLoggingInterceptor) //日志,所有的请求响应度看到
-//                            .cache(cache)  //添加缓存
-//                            .connectTimeout(60, TimeUnit.SECONDS)
-//                            .readTimeout(60, TimeUnit.SECONDS)
-//                            .writeTimeout(60, TimeUnit.SECONDS)
-//                            .build();
                     client = ProgressManager.getInstance().with(new OkHttpClient.Builder())
                             .addInterceptor(addQueryParameterInterceptor())  //参数添加
                             .addInterceptor(addHeaderInterceptor()) // token过滤
@@ -159,7 +150,7 @@ public class Http {
                     retrofit = new Retrofit
                             .Builder()
                             .client(client)
-                            .baseUrl("http://192.168.0.90:8080/webfile/")
+                            .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL)+"webfile/")
                             .addConverterFactory(ScalarsConverterFactory.create()) //这里直接返回字符串
                             .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
                             .build();

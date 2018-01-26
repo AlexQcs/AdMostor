@@ -298,6 +298,7 @@ public class ProgramBean {
             private int type;// 素材类型：  //1:图片，2:视频，3:音频，4:文字,5:网址
             private String suffix;// 素材文件后缀
             private String matName;// 素材原名称
+            private String content;//文件格式是md5,其他格式是显示的内容
 
             public String getItemId() {
                 return itemId;
@@ -353,6 +354,14 @@ public class ProgramBean {
 
             public void setMatName(String matName) {
                 this.matName = matName;
+            }
+
+            public String getContent() {
+                return content;
+            }
+
+            public void setContent(String content) {
+                this.content = content;
             }
 
             @Override

@@ -2,6 +2,7 @@ package com.hc.admc.request;
 
 import com.hc.admc.bean.program.ProgramBean;
 import com.hc.admc.bean.program.RegistBean;
+import com.hc.admc.bean.program.UMengBean;
 
 import okhttp3.ResponseBody;
 import retrofit2.Call;
@@ -52,6 +53,24 @@ public interface ApiService {
 
     @GET("/api/sync_finish.do")
     Call<ResponseBody> sysncFinish(@Query("terminalId")String mac);
+
+    /**
+     * 作用:
+     *
+     * @param
+     * @return
+     * @exception/throws
+     */
+    @GET("/api/notification.do")
+    Call<UMengBean> pollingTask(@Query("signature") String signature,
+                                @Query("timestamp") String timestamp,
+                                @Query("token") String token,
+                                @Query("deviceId")String deviceId);
+
+    @GET("/api/network_online.do")
+    Call<ResponseBody> notifyOnLine(@Query("terminalId")String mac);
+
+
 
 
 }

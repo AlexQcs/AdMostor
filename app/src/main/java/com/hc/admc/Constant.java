@@ -38,4 +38,5 @@ public class Constant {
     //SharedPreferences
     public static final String DEVICE_TOKEN="device_token";
     public static final String REGISTERED="registered";
+    public static final String SP_BASEURL="baseurl";
 }
