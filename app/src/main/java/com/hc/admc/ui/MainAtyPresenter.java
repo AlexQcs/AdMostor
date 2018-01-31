@@ -1,17 +1,15 @@
 package com.hc.admc.ui;
 
-import android.content.Context;
-import android.os.Handler;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.alex.mvp.presenter.BaseMvpPresenter;
 import com.google.gson.Gson;
 import com.hc.admc.Constant;
 import com.hc.admc.application.MyApplication;
 import com.hc.admc.bean.program.ProgramBean;
+import com.hc.admc.bean.program.PushBean;
 import com.hc.admc.bean.program.RegistBean;
-import com.hc.admc.bean.program.UMengBean;
+import com.hc.admc.request.Api;
 import com.hc.admc.request.ApiService;
 import com.hc.admc.request.CommonSubscriber;
 import com.hc.admc.request.Http;
@@ -20,12 +18,15 @@ import com.hc.admc.util.FileUtils;
 import com.hc.admc.util.MD5;
 import com.hc.admc.util.SpUtils;
 import com.hc.admc.util.StringUtils;
-import com.umeng.message.PushAgent;
-import com.umeng.message.UmengMessageHandler;
-import com.umeng.message.entity.UMessage;
+
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.drafts.Draft_17;
+import org.java_websocket.handshake.ServerHandshake;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -46,7 +47,6 @@ import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
-import static android.os.Looper.getMainLooper;
 import static com.hc.admc.Constant.LOCAL_PROGRAM_PATH;
 
 /**
@@ -65,7 +65,9 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
     private Subscription mProgramSubscription;//播放节目单读秒器订阅
     private Subscription mRigisterSubscription;//注册轮询订阅
     private Subscription mPollingTaskSubscription;//获取任务轮询订阅
-    private Subscription mPollingOnlineSubscrition;//通知在线轮询订阅
+    private Subscription mPollingOnlineSubscription;//通知在线轮询订阅
+    private Subscription mConnSocketSubscription;//链接WebSocket订阅
+    private Subscription mReconnSocketSubscription;
     private List<ProgramBean.ProgramListBean> mProgramListBeens;//播放节目单列表订阅
     private Subscription mDownLoadSubscription;//下载资源文件订阅
     private Subscription mMD5Subscription;//MD5校验订阅
@@ -76,7 +78,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
     private boolean mRegistered = false;
 
-    private PushAgent mPushAgent;
+    private WebSocketClient mSocketClient;
     private HashMap<String, String> mItemMD5Map;//播放资源md5map
 
 //    private volatile String mDeviceToken;
@@ -102,36 +104,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                             if (mRegistered) {
                                 mRigisterSubscription.unsubscribe();
                             } else {
-                                mPushAgent = PushAgent.getInstance(MyApplication.getContext());
-                                UmengMessageHandler messageHandler = new UmengMessageHandler() {
-                                    @Override
-                                    public void dealWithCustomMessage(final Context context, final UMessage msg) {
-                                        new Handler(getMainLooper()).post(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                // 对于自定义消息，PushSDK默认只统计送达。若开发者需要统计点击和忽略，则需手动调用统计方法。
-                                                Log.i("友盟消息", msg.custom);
-                                                getMvpView().receiveUmengMsg(msg.custom);
-                                                Gson gson = new Gson();
-                                                UMengBean uMeng = gson.fromJson(msg.custom, UMengBean.class);
-                                                Log.e("友盟消息解析", uMeng.toString());
-                                                Toast.makeText(context, msg.custom, Toast.LENGTH_LONG).show();
-                                                switch (uMeng.getCode()) {
-                                                    case 10003:
-                                                        Map<String, String> data = uMeng.getData();
-                                                        String url = data.get("url");
-                                                        String id = data.get("taskId");
-                                                        requestProgram(url, id);
-                                                        break;
-                                                }
-                                            }
-                                        });
-                                    }
-                                };
-                                mPushAgent.setMessageHandler(messageHandler);
-                                String mDeviceToken = mPushAgent.getRegistrationId();
-                                SpUtils.put(Constant.DEVICE_TOKEN, mDeviceToken);
-                                registDevice(mDeviceToken);
+                                registDevice();
                             }
                         }
                     });
@@ -148,10 +121,12 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         }
         //播放节目单
         playProgram(programBean.getProgramList());
+        //链接WebSocket
+        connSocket();
         //轮询服务器接口
-        pollingGetTask();
+//        pollingGetTask();
         //通知终端在线
-        pollingOnLine();
+//        pollingOnLine();
     }
 
     /**
@@ -167,10 +142,10 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                         String token = Constant.TOKEN;
                         String signature = StringUtils.getSignature(time_s, token);
                         String deviceid = Constant.MAC;
-                        mMainAtyMode.pollingTask(signature, time_s, token, deviceid, new Callback<UMengBean>() {
+                        mMainAtyMode.pollingTask(signature, time_s, token, deviceid, new Callback<PushBean>() {
                             @Override
-                            public void onResponse(Call<UMengBean> call, Response<UMengBean> response) {
-                                UMengBean uMengBean = response.body();
+                            public void onResponse(Call<PushBean> call, Response<PushBean> response) {
+                                PushBean uMengBean = response.body();
                                 if (uMengBean == null) {
                                     Log.e("友盟消息解析", "接收到异常数据");
                                     return;
@@ -196,10 +171,93 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                             }
 
                             @Override
-                            public void onFailure(Call<UMengBean> call, Throwable t) {
+                            public void onFailure(Call<PushBean> call, Throwable t) {
 
                             }
                         });
+                    }
+                });
+    }
+
+    public void connSocket() {
+        if (mSocketClient != null) {
+            mSocketClient.close();
+
+        }
+        if (mConnSocketSubscription != null && !mConnSocketSubscription.isUnsubscribed()) {
+            mConnSocketSubscription.unsubscribe();
+        }
+        if (mReconnSocketSubscription != null && !mReconnSocketSubscription.isUnsubscribed()) {
+            mReconnSocketSubscription.unsubscribe();
+        }
+        String deviceid = Constant.MAC;
+        String socketUrl = "ws://" + SpUtils.get("base_url", Api.BASE_URL) + "webSocket/" + deviceid;
+        Log.e(TAG, socketUrl);
+        mConnSocketSubscription = Observable.just(socketUrl)
+                .subscribeOn(Schedulers.newThread())
+                .subscribe(new Action1<String>() {
+                    @Override
+                    public void call(String url) {
+                        try {
+                            mSocketClient = new WebSocketClient(new URI(url), new Draft_17()) {
+                                @Override
+                                public void onOpen(ServerHandshake handshakedata) {
+                                    Log.e("WebSocketClient", "打开通道" + handshakedata.getHttpStatus());
+                                }
+
+                                @Override
+                                public void onMessage(String message) {
+                                    Log.e("WebSocketClient", "接收消息" + message);
+                                    Gson gson = new Gson();
+
+                                    PushBean pushBean = gson.fromJson(message, PushBean.class);
+                                    if (pushBean == null) {
+                                        Log.e("推送消息解析", "接收到异常数据");
+                                        return;
+                                    }
+                                    Log.e("友盟消息解析", pushBean.toString());
+                                    switch (pushBean.getCode()) {
+
+                                        case 1001:
+                                            Log.e(TAG, "关机消息");
+                                            //关机
+                                            break;
+                                        case 1002:
+                                            Log.e(TAG, "关机消息");
+                                            break;
+
+                                        case 10003:
+                                            Map<String, String> data = pushBean.getData();
+                                            String url = data.get("url");
+                                            String id = data.get("taskId");
+                                            requestProgram(url, id);
+                                            break;
+                                    }
+                                }
+
+                                @Override
+                                public void onClose(int code, String reason, boolean remote) {
+                                    Log.e("WebSocketClient", "通道关闭" + reason);
+                                }
+
+                                @Override
+                                public void onError(Exception ex) {
+                                    Log.e("WebSocketClient", "链接失败");
+
+                                    mReconnSocketSubscription = Observable.timer(5, TimeUnit.SECONDS).subscribe(
+                                            new Action1<Long>() {
+                                                @Override
+                                                public void call(Long aLong) {
+                                                    connSocket();
+                                                }
+                                            }
+                                    );
+                                }
+                            };
+                            mSocketClient.connect();
+                        } catch (URISyntaxException e) {
+                            e.printStackTrace();
+                        }
                     }
                 });
     }
@@ -209,7 +267,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
      */
     public void pollingOnLine() {
         final String deviceid = Constant.MAC;
-        mPollingOnlineSubscrition = Observable.interval(1, TimeUnit.MINUTES)
+        mPollingOnlineSubscription = Observable.interval(1, TimeUnit.MINUTES)
                 .subscribeOn(Schedulers.io())
                 .subscribe(new Action1<Long>() {
 
@@ -234,22 +292,17 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
     /**
      * 作用:注册设备
-     *
-     * @param device_token
-     *         设备码
+     * <p>
+     * 设备码
      */
-    private void registDevice(String device_token) {
-        if (device_token.equals("")) {
-            Log.e(TAG, "注册失败，友盟device_token为空！");
-            return;
-        }
+    private void registDevice() {
         String time_s = System.currentTimeMillis() + "";
         String token = Constant.TOKEN;
         String signature = StringUtils.getSignature(time_s, token);
         String deviceid = Constant.MAC;
 //        String device_token = (String) SpUtils.get(Constant.DEVICE_TOKEN, "");
 
-        mMainAtyMode.regist(signature, time_s, token, deviceid, device_token, new Callback<RegistBean>() {
+        mMainAtyMode.regist(signature, time_s, token, deviceid, new Callback<RegistBean>() {
             @Override
             public void onResponse(Call<RegistBean> call, Response<RegistBean> response) {
 
@@ -386,9 +439,9 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                     for (String s : fileList) {
                         //获取资源下载列表
                         String[] array = s.split("/");
-                        String folderPath = LOCAL_PROGRAM_PATH + File.separator + array[0];
+                        String folderPath = LOCAL_PROGRAM_PATH + File.separator + array[1];
                         FileUtils.folderCreate(folderPath);
-                        fileUrlList.add(been.getDomain() + s);
+                        fileUrlList.add("http://" + (String) SpUtils.get("base_url", Api.BASE_URL) + s);
                     }
                 }
 
@@ -423,7 +476,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                                     isDone = MD5.decode(file, md5);
                                                     if (!isDone) {
                                                         Log.e(TAG, "下载节目未完成");
-                                                        continue;
+                                                        return;
                                                     }
                                                 }
                                                 if (isDone) {
@@ -438,15 +491,16 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
                             @Override
                             public void onError(Throwable e) {
-
+                                e.printStackTrace();
                             }
 
                             @Override
                             public void onNext(String url) {
                                 String[] tempArray = url.split("/");
-
+                                Log.e("下载地址", url);
                                 final String path = tempArray[tempArray.length - 2] + File.separator + tempArray[tempArray.length - 1];
                                 final File file = new File(LOCAL_PROGRAM_PATH + File.separator + path);
+                                Log.e("文件路径", file.getPath());
                                 if (file.exists()) return;
                                 apiService.downloadFile(url)
                                         .subscribeOn(Schedulers.io())
@@ -559,7 +613,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         unsubscribeSub(mProgramSubscription);
         unsubscribeSub(mRigisterSubscription);
         unsubscribeSub(mPollingTaskSubscription);
-        unsubscribeSub(mPollingOnlineSubscrition);
+        unsubscribeSub(mPollingOnlineSubscription);
     }
 
     /**

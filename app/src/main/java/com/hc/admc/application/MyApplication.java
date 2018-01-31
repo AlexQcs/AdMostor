@@ -2,11 +2,8 @@ package com.hc.admc.application;
 
 import android.app.Application;
 import android.content.Context;
-import android.util.Log;
 
 import com.squareup.leakcanary.LeakCanary;
-import com.umeng.message.IUmengRegisterCallback;
-import com.umeng.message.PushAgent;
 
 /**
  * Created by Alex on 2017/12/7.
@@ -31,20 +28,6 @@ public class MyApplication extends Application {
         LeakCanary.install(this);
         instance = this;
         mContext=this;
-        PushAgent mPushAgent = PushAgent.getInstance(this);
-//注册推送服务，每次调用register方法都会回调该接口
-        mPushAgent.register(new IUmengRegisterCallback() {
-
-            @Override
-            public void onSuccess(String deviceToken) {
-                Log.e("umengtoken", deviceToken);
-            }
-
-            @Override
-            public void onFailure(String s, String s1) {
-
-            }
-        });
     }
 
     public boolean isProgramPlay() {

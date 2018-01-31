@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- 开机启动 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.READ_LOGS"/>
 
     <application
 
@@ -28,14 +32,14 @@
             </intent-filter>
         </activity>
 
-        <meta-data
-            android:name="UMENG_APPKEY"
-            android:value="5a28e3aef43e4857540000b3">
-        </meta-data>
-        <meta-data
-            android:name="UMENG_MESSAGE_SECRET"
-            android:value="f2b892b1882b502253af6171007d10b3">
-        </meta-data>
+        <receiver android:name=".broadcast.AutoStartReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+
+                <category android:name="android.intent.category.HOME"/>
+            </intent-filter>
+        </receiver>
+
 
         <activity android:name=".SetUrlActivity">
 

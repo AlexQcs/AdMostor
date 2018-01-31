@@ -43,10 +43,12 @@ import android.widget.Toast;
 import com.alex.mvp.factory.CreatePresenter;
 import com.alex.mvp.view.AbstractMvpActivitiy;
 import com.bumptech.glide.Glide;
+import com.google.gson.Gson;
 import com.hc.admc.application.MyApplication;
 import com.hc.admc.base.ActivityCollector;
 import com.hc.admc.base.OnPermissionCallbackListener;
 import com.hc.admc.bean.program.ProgramBean;
+import com.hc.admc.bean.program.TextBean;
 import com.hc.admc.ui.MainAtyPresenter;
 import com.hc.admc.ui.MainView;
 import com.hc.admc.util.FieldView;
@@ -56,12 +58,10 @@ import com.hc.admc.util.SpUtils;
 import com.hc.admc.util.ViewFind;
 import com.hc.admc.view.CustomTextView;
 import com.hc.admc.view.LEDView;
-import com.umeng.message.PushAgent;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -119,7 +119,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     private Timer mTimer;//图片定时器
     private TimerTask mTask;
     private boolean mIsDestroy;
-    private Map<String,MediaPlayer> mPlayerMap;
+    private Map<String, MediaPlayer> mPlayerMap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -128,7 +128,6 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
         ViewFind.bind(this);
-        PushAgent.getInstance(this).onAppStart();
         initData();
         initView();
         initEvent();
@@ -145,7 +144,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         mItemIndexMap = new HashMap<>();
         mItemMD5 = new HashMap<>();
         mItemResList = new HashMap<>();
-        mPlayerMap=new HashMap<>();
+        mPlayerMap = new HashMap<>();
 
         mImageHandler = new ImageHandler(this);
 
@@ -192,7 +191,6 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         RelativeLayout.LayoutParams itemParams = new RelativeLayout.LayoutParams(width, height);
         itemParams.setMargins(marginLeft, marginTop, 0, 0);
 
-
     }
 
     void initEvent() {
@@ -219,11 +217,12 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                                 } else {
                                     String baseurl = "";
                                     if (!"".equals(port)) {
-                                        baseurl = "http://" + url + ":" + port + "/";
+                                        baseurl = url + ":" + port + "/";
                                     } else {
-                                        baseurl = "http://" + url + "/";
+                                        baseurl = url + "/";
                                     }
                                     SpUtils.put("base_url", baseurl);
+                                    getMvpPresenter().connSocket();
                                 }
                             }
                         })
@@ -252,25 +251,19 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         message.what = 1;
         mImageHandler.sendMessage(message);
         for (ProgramBean.ProgramListBean.LayoutBean.ItemsBean item : items) {
-
             int width = Integer.parseInt(item.getReality_width());
             int height = Integer.parseInt(item.getReality_height());
             int marginLeft = item.getReality_x();
             int marginTop = item.getReality_y();
             FrameLayout.LayoutParams itemParams = new FrameLayout.LayoutParams(width, height);
             itemParams.setMargins(marginLeft, marginTop, 0, 0);
-
             String[] itemIdArray = item.getId().split("_");
             switch (itemIdArray[0]) {
                 case VIDEOLAYOUT:
-
-                    FrameLayout frameLayout=new FrameLayout(mContext);
+                    FrameLayout frameLayout = new FrameLayout(mContext);
                     frameLayout.setLayoutParams(itemParams);
                     mProgramLayout.addView(frameLayout);
-                    mPlayerMap.put(item.getId(),new MediaPlayer());
-//                    TextureView textureView = new TextureView(mContext);
-//                    textureView.setLayoutParams(itemParams);
-//                    mProgramLayout.addView(textureView);
+                    mPlayerMap.put(item.getId(), new MediaPlayer());
                     break;
                 case IMAGELAYOUT:
                     ImageView imageView = new ImageView(mContext);
@@ -286,6 +279,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                     break;
                 case TEXTLAYOUT:
                     CustomTextView textView = new CustomTextView(mContext);
+                    textView.setTextSize(height);
                     textView.setLayoutParams(itemParams);
                     mProgramLayout.addView(textView);
                     break;
@@ -371,18 +365,18 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
 
     private void playVideo(final ArrayList<String> pathList, final String itemid, final int childViewIndex) {
 
-        FrameLayout frameLayout= (FrameLayout) mProgramLayout.getChildAt(childViewIndex);
+        FrameLayout frameLayout = (FrameLayout) mProgramLayout.getChildAt(childViewIndex);
         if (pathList == null || pathList.size() == 0) {
             Log.e(TAG, "视频列表为空");
         } else {
-            playVideo(frameLayout,pathList,itemid);
+            playVideo(frameLayout, pathList, itemid);
         }
 
     }
 
-    private void playVideo(FrameLayout frameLayout,final ArrayList<String> pathList,final String itemid){
+    private void playVideo(FrameLayout frameLayout, final ArrayList<String> pathList, final String itemid) {
         Log.e(TAG, itemid + "播放视频");
-        final TextureView textureView=new TextureView(mContext);
+        final TextureView textureView = new TextureView(mContext);
         FrameLayout.LayoutParams viewParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         textureView.setLayoutParams(viewParams);
         frameLayout.addView(textureView);
@@ -392,7 +386,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
 
                 Surface s = new Surface(surface);
                 try {
-                    mPlayerMap.put(itemid,new MediaPlayer());
+                    mPlayerMap.put(itemid, new MediaPlayer());
                     String path = Constant.LOCAL_PROGRAM_PATH + File.separator + pathList.get(mItemIndexMap.get(itemid));
                     mPlayerMap.get(itemid).setDataSource(path);
                     mPlayerMap.get(itemid).setSurface(s);
@@ -413,8 +407,8 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                                 currentIdx = 0;
                             }
                             mItemIndexMap.put(itemid, currentIdx);
-                            if (textureView.isAvailable()){
-                                onSurfaceTextureAvailable(surface,width,height);
+                            if (textureView.isAvailable()) {
+                                onSurfaceTextureAvailable(surface, width, height);
                             }
                         }
                     });
@@ -432,7 +426,8 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
 
             @Override
             public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-//                    mMediaPlayer.stop();
+                mPlayerMap.get(itemid).stop();
+                mPlayerMap.get(itemid).release();
                 return true;
             }
 
@@ -461,8 +456,6 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     }
 
     public void playImage(Message msg) {
-
-        SimpleDateFormat format = new SimpleDateFormat("hh:mm:ss");
         switch (msg.what) {
             case 0:
                 if (mTimer != null) {
@@ -599,8 +592,13 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         if (contentList == null || contentList.size() == 0) {
             Log.e(TAG, "网页列表为空");
         } else {
+            Gson gson=new Gson();
+            TextBean textBean=gson.fromJson(contentList.get(mItemIndexMap.get(itemid)),TextBean.class);
+            int textsize=textBean.getFontSize();
+            String content=textBean.getContent();
+            textView.setTextSize(textsize);
             textView.setFocusable(true);
-            textView.setText(contentList.get(mItemIndexMap.get(itemid)));
+            textView.setText(content);
             textView.startMove();
             textView.setOnMoveOver(new CustomTextView.onMoveOver() {
                 @Override
@@ -750,7 +748,8 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                 Manifest.permission.CHANGE_WIFI_STATE,
                 Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.ACCESS_NETWORK_STATE
         }, new OnPermissionCallbackListener() {
             @Override
             public void onGranted() {

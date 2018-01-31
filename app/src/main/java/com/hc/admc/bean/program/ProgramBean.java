@@ -33,7 +33,6 @@ public class ProgramBean {
         private int playNum;// 节目播发顺序
         private TimingBean timing;// 节目播发时间
         private List<MatItemBean> matItem;// 素材列表
-        private String domain;//资源下载服务器地址
         private List<String> resource;//资源地址列表
 
         public LayoutBean getLayout() {
@@ -60,13 +59,6 @@ public class ProgramBean {
             this.timing = timing;
         }
 
-        public String getDomain() {
-            return domain;
-        }
-
-        public void setDomain(String domain) {
-            this.domain = domain;
-        }
 
         public List<MatItemBean> getMatItem() {
             return matItem;
@@ -385,7 +377,6 @@ public class ProgramBean {
                     ", playNum=" + playNum +
                     ", timing=" + timing +
                     ", matItem=" + matItem +
-                    ", domain='" + domain + '\'' +
                     ", resource=" + resource +
                     '}';
         }

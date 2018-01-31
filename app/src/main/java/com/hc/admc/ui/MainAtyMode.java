@@ -4,7 +4,7 @@ import android.util.Log;
 
 import com.hc.admc.bean.program.ProgramBean;
 import com.hc.admc.bean.program.RegistBean;
-import com.hc.admc.bean.program.UMengBean;
+import com.hc.admc.bean.program.PushBean;
 import com.hc.admc.request.Api;
 import com.hc.admc.request.ApiService;
 import com.hc.admc.util.SpUtils;
@@ -28,10 +28,10 @@ public class MainAtyMode {
     private Call<ProgramBean> mProgramBeanCall;
     private Call<ResponseBody> mResponseBodyCall;
     private Call<RegistBean> mRegistBeanCall;
-    private Call<UMengBean> mUMengBeanCall;
+    private Call<PushBean> mUMengBeanCall;
     private static OkHttpClient client;
 
-    public void regist(String signature, String timestamp, String token, String deviceId, String deviceToken, Callback<RegistBean> callback) {
+    public void regist(String signature, String timestamp, String token, String deviceId, Callback<RegistBean> callback) {
 
 //        String time_s=System.currentTimeMillis()+"";
 //        String token= Constant.TOKEN;
@@ -47,13 +47,13 @@ public class MainAtyMode {
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
 
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .baseUrl("http://"+(String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(client)
                 .build();
         ApiService apiService = retrofit.create(ApiService.class);
 
-        mRegistBeanCall = apiService.registToService(signature, timestamp, token, deviceId, deviceToken);
+        mRegistBeanCall = apiService.registToService(signature, timestamp, token, deviceId);
         mRegistBeanCall.enqueue(callback);
     }
 
@@ -68,7 +68,7 @@ public class MainAtyMode {
         logging.setLevel(HttpLoggingInterceptor.Level.BODY);
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .baseUrl("http://"+(String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(client)
                 .build();
@@ -77,7 +77,7 @@ public class MainAtyMode {
         mProgramBeanCall.enqueue(callback);
     }
 
-    public void pollingTask(String signature, String timestamp, String token, String deviceId,Callback<UMengBean> callback){
+    public void pollingTask(String signature, String timestamp, String token, String deviceId,Callback<PushBean> callback){
         client = new OkHttpClient();
         HttpLoggingInterceptor logging = new HttpLoggingInterceptor(new HttpLoggingInterceptor.Logger() {
             @Override
@@ -88,7 +88,7 @@ public class MainAtyMode {
         logging.setLevel(HttpLoggingInterceptor.Level.BODY);
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .baseUrl("http://"+(String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(GsonConverterFactory.create())
                 .client(client)
                 .build();
@@ -108,7 +108,7 @@ public class MainAtyMode {
         logging.setLevel(HttpLoggingInterceptor.Level.BODY);
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .baseUrl("http://"+(String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(ScalarsConverterFactory.create())
                 .client(client)
                 .build();
@@ -128,7 +128,7 @@ public class MainAtyMode {
         logging.setLevel(HttpLoggingInterceptor.Level.BODY);
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .baseUrl("http://"+(String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(ScalarsConverterFactory.create())
                 .client(client)
                 .build();
@@ -148,7 +148,7 @@ public class MainAtyMode {
         logging.setLevel(HttpLoggingInterceptor.Level.BODY);
         client = new OkHttpClient.Builder().addInterceptor(logging).build();
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL))
+                .baseUrl("http://"+(String) SpUtils.get("base_url",Api.BASE_URL))
                 .addConverterFactory(ScalarsConverterFactory.create())
                 .client(client)
                 .build();

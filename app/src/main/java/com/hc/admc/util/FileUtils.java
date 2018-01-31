@@ -106,10 +106,12 @@ public class FileUtils {
 
     public static void downloadFile(ResponseBody body, File file) {
         long currentLength = 0;
+
         OutputStream os = null;
         InputStream is = body.byteStream();
 //        long totalLength =response.body().contentLength();
         try {
+            file.createNewFile();
             os = new FileOutputStream(file);
             int len;
             byte[] buff = new byte[1024];

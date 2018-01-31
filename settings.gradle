@@ -1,1 +1,1 @@
-include ':app', ':mvp', ':PushSDK'
+include ':app', ':mvp'

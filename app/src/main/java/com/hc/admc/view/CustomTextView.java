@@ -43,6 +43,7 @@ public class CustomTextView extends View {
     private String space = "";
     private String drawingText = "";
     private TextPaint paint;
+    private float mTextSize;
     public boolean exitFlag;
     private float textWidth;
     private String _mText;
@@ -71,10 +72,14 @@ public class CustomTextView extends View {
         initView();
     }
 
+    public void setTextSize(float textSize) {
+        mTextSize = textSize;
+        paint.setTextSize(mTextSize);
+    }
+
     private void initView() {
         paint = new TextPaint();
         paint.setAntiAlias(true);
-        paint.setTextSize(30F);
         rf = new RectF(0, 0, 0, 0);
 
     }

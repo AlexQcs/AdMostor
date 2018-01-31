@@ -3,7 +3,6 @@ package com.hc.admc.request;
 import android.util.Log;
 
 import com.hc.admc.application.MyApplication;
-import com.hc.admc.util.SpUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -150,7 +149,8 @@ public class Http {
                     retrofit = new Retrofit
                             .Builder()
                             .client(client)
-                            .baseUrl((String) SpUtils.get("base_url",Api.BASE_URL)+"webfile/")
+//                            .baseUrl("http://"+(String) SpUtils.get("base_url",Api.BASE_URL))
+                            .baseUrl("http://192.168.0.59:8080")
                             .addConverterFactory(ScalarsConverterFactory.create()) //这里直接返回字符串
                             .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
                             .build();
