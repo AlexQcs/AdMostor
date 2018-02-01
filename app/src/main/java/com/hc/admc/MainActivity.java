@@ -88,6 +88,10 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
 
     @FieldView(R.id.tv_skip_setip)
     private TextView mTvSkipSetip;//跳出设置ip的dialog
+    @FieldView(R.id.tv_serialnum)
+    private TextView mTvSerialNum;
+    @FieldView(R.id.img_online)
+    private ImageView mImgOnline;
 
     private EditText mEtvUrl;
     private EditText mEtvPort;
@@ -121,6 +125,8 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     private boolean mIsDestroy;
     private Map<String, MediaPlayer> mPlayerMap;
 
+    private final Handler mLineStatusHandler=new LineStatusHandler(this);
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -151,29 +157,8 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     }
 
     void initView() {
-////        mWebView.loadUrl("http://www.baidu.com");
-//        // 开启 localStorage
-//        mWebView.getSettings().setDomStorageEnabled(true);
-//        // 设置支持javascript
-//        mWebView.getSettings().setJavaScriptEnabled(true);
-//        // 启动缓存
-//        mWebView.getSettings().setAppCacheEnabled(true);
-//        // 设置缓存模式
-//        mWebView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
-//        //使用自定义的WebViewClient
-////        mWebView.getSettings().setUserAgentString("Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.134 Safari/537.36");
-//        mWebView.setWebViewClient(new WebViewClient()
-//        {
-//
-//            @Override
-//            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-////                view.loadUrl(requ);
-//                return true;
-//            }
-//
-//
-//        });
-//        mWebView.loadUrl("http://www.baidu.com");
+
+        mTvSerialNum.setText(Constant.getSerialNumber());
         Display display = getWindowManager().getDefaultDisplay();
         Point size = new Point();
         display.getSize(size);
@@ -183,6 +168,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         mProgramLayout = (FrameLayout) findViewById(R.id.frame_program);
         mAtyLayoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
         mProgramLayout.setLayoutParams(mAtyLayoutParams);
+        mImgOnline.setImageResource(R.mipmap.errline);
 
         int width = 500;
         int height = 500;
@@ -360,6 +346,56 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                     }
                 }
             }
+        }
+    }
+
+    @Override
+    public void online() {
+        Message message = new Message();
+        message.what = 1;
+        mLineStatusHandler.sendMessage(message);
+    }
+
+    @Override
+    public void offline() {
+        Message message = new Message();
+        message.what = 0;
+        mLineStatusHandler.sendMessage(message);
+    }
+
+    @Override
+    public void errline() {
+        Message message = new Message();
+        message.what = 2;
+        mLineStatusHandler.sendMessage(message);
+    }
+
+    static class LineStatusHandler extends Handler{
+        private final WeakReference<MainActivity> mActivity;
+        public LineStatusHandler(MainActivity mainActivity){
+            mActivity=new WeakReference<MainActivity>(mainActivity);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            if (mActivity.get()==null){
+                return;
+            }
+            mActivity.get().setLineStatus(msg);
+        }
+    }
+
+    public void setLineStatus(Message message){
+        switch (message.what){
+            case 0:
+                mImgOnline.setImageResource(R.mipmap.errline);
+                break;
+            case 1:
+                mImgOnline.setImageResource(R.mipmap.online);
+                break;
+            case 2:
+                mImgOnline.setImageResource(R.mipmap.offline);
+                break;
         }
     }
 

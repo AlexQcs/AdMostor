@@ -1,14 +1,15 @@
 package com.hc.admc.request;
 
 import com.hc.admc.bean.program.ProgramBean;
-import com.hc.admc.bean.program.RegistBean;
 import com.hc.admc.bean.program.PushBean;
+import com.hc.admc.bean.program.RegistBean;
 
 import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
 import retrofit2.http.Query;
+import retrofit2.http.Streaming;
 import retrofit2.http.Url;
 import rx.Observable;
 
@@ -57,6 +58,7 @@ public interface ApiService {
      * @param fileUrl
      *         资源地址
      */
+    @Streaming
     @GET
     Observable<ResponseBody> downloadFile(@Url String fileUrl);
 

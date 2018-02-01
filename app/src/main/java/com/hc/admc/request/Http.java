@@ -6,6 +6,8 @@ import com.hc.admc.application.MyApplication;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import me.jessyan.progressmanager.ProgressManager;
@@ -132,15 +134,16 @@ public class Http {
                     });
                     //可以设置请求过滤的水平,body,basic,headers
                     httpLoggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+                    ExecutorService executorService = Executors.newFixedThreadPool(1);
                     //设置请求的缓存的大小跟位置
                     File cacheFile = new File(MyApplication.getContext().getCacheDir(), "cache");
                     Cache cache = new Cache(cacheFile, 1024 * 1024 * 50);//50M的缓存
 
                     client = ProgressManager.getInstance().with(new OkHttpClient.Builder())
                             .addInterceptor(addQueryParameterInterceptor())  //参数添加
-                            .addInterceptor(addHeaderInterceptor()) // token过滤
-                            .addInterceptor(httpLoggingInterceptor) //日志,所有的请求响应度看到
-                            .cache(cache)  //添加缓存
+//                            .addInterceptor(addHeaderInterceptor()) // token过滤
+//                            .addInterceptor(httpLoggingInterceptor) //日志,所有的请求响应度看到
+//                            .cache(cache)  //添加缓存
                             .connectTimeout(60, TimeUnit.SECONDS)
                             .readTimeout(60, TimeUnit.SECONDS)
                             .writeTimeout(60, TimeUnit.SECONDS)
@@ -153,6 +156,7 @@ public class Http {
                             .baseUrl("http://192.168.0.59:8080")
                             .addConverterFactory(ScalarsConverterFactory.create()) //这里直接返回字符串
                             .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+                            .callbackExecutor(executorService)
                             .build();
                 }
             }

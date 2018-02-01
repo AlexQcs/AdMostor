@@ -11,4 +11,7 @@ import com.hc.admc.bean.program.ProgramBean;
 public interface MainView extends BaseMvpView {
     void receiveUmengMsg(String msg);
     void playProgram(ProgramBean.ProgramListBean bean);
+    void online();
+    void offline();
+    void errline();
 }

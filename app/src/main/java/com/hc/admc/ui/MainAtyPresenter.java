@@ -64,8 +64,6 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
     private Subscription mProgramSubscription;//播放节目单读秒器订阅
     private Subscription mRigisterSubscription;//注册轮询订阅
-    private Subscription mPollingTaskSubscription;//获取任务轮询订阅
-    private Subscription mPollingOnlineSubscription;//通知在线轮询订阅
     private Subscription mConnSocketSubscription;//链接WebSocket订阅
     private Subscription mReconnSocketSubscription;
     private List<ProgramBean.ProgramListBean> mProgramListBeens;//播放节目单列表订阅
@@ -130,59 +128,11 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
     }
 
     /**
-     * 作用:轮询获取相关指令
+     * 作用:连接WebSocket用于接收节目单推送或者其他消息
      */
-    public void pollingGetTask() {
-        mPollingTaskSubscription = Observable.interval(10, TimeUnit.SECONDS)
-                .subscribeOn(Schedulers.io())
-                .subscribe(new Action1<Long>() {
-                    @Override
-                    public void call(Long aLong) {
-                        String time_s = System.currentTimeMillis() + "";
-                        String token = Constant.TOKEN;
-                        String signature = StringUtils.getSignature(time_s, token);
-                        String deviceid = Constant.MAC;
-                        mMainAtyMode.pollingTask(signature, time_s, token, deviceid, new Callback<PushBean>() {
-                            @Override
-                            public void onResponse(Call<PushBean> call, Response<PushBean> response) {
-                                PushBean uMengBean = response.body();
-                                if (uMengBean == null) {
-                                    Log.e("友盟消息解析", "接收到异常数据");
-                                    return;
-                                }
-                                Log.e("友盟消息解析", uMengBean.toString());
-                                switch (uMengBean.getCode()) {
-
-                                    case 1001:
-                                        Log.e(TAG, "关机消息");
-                                        //关机
-                                        break;
-                                    case 1002:
-                                        Log.e(TAG, "关机消息");
-                                        break;
-
-                                    case 10003:
-                                        Map<String, String> data = uMengBean.getData();
-                                        String url = data.get("url");
-                                        String id = data.get("taskId");
-                                        requestProgram(url, id);
-                                        break;
-                                }
-                            }
-
-                            @Override
-                            public void onFailure(Call<PushBean> call, Throwable t) {
-
-                            }
-                        });
-                    }
-                });
-    }
-
     public void connSocket() {
         if (mSocketClient != null) {
             mSocketClient.close();
-
         }
         if (mConnSocketSubscription != null && !mConnSocketSubscription.isUnsubscribed()) {
             mConnSocketSubscription.unsubscribe();
@@ -195,6 +145,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         Log.e(TAG, socketUrl);
         mConnSocketSubscription = Observable.just(socketUrl)
                 .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Action1<String>() {
                     @Override
                     public void call(String url) {
@@ -203,6 +154,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                 @Override
                                 public void onOpen(ServerHandshake handshakedata) {
                                     Log.e("WebSocketClient", "打开通道" + handshakedata.getHttpStatus());
+                                    getMvpView().online();
                                 }
 
                                 @Override
@@ -238,12 +190,13 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                 @Override
                                 public void onClose(int code, String reason, boolean remote) {
                                     Log.e("WebSocketClient", "通道关闭" + reason);
+                                    getMvpView().offline();
                                 }
 
                                 @Override
                                 public void onError(Exception ex) {
                                     Log.e("WebSocketClient", "链接失败");
-
+                                    getMvpView().errline();
                                     mReconnSocketSubscription = Observable.timer(5, TimeUnit.SECONDS).subscribe(
                                             new Action1<Long>() {
                                                 @Override
@@ -256,38 +209,19 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                             };
                             mSocketClient.connect();
                         } catch (URISyntaxException e) {
+                            getMvpView().errline();
+                            mReconnSocketSubscription = Observable.timer(5, TimeUnit.SECONDS).subscribe(
+                                    new Action1<Long>() {
+                                        @Override
+                                        public void call(Long aLong) {
+                                            connSocket();
+                                        }
+                                    }
+                            );
                             e.printStackTrace();
                         }
                     }
                 });
-    }
-
-    /**
-     * 作用:轮询通知服务器客户端在线
-     */
-    public void pollingOnLine() {
-        final String deviceid = Constant.MAC;
-        mPollingOnlineSubscription = Observable.interval(1, TimeUnit.MINUTES)
-                .subscribeOn(Schedulers.io())
-                .subscribe(new Action1<Long>() {
-
-                               @Override
-                               public void call(Long aLong) {
-                                   mMainAtyMode.notifyOnLion(deviceid, new Callback<ResponseBody>() {
-                                       @Override
-                                       public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-                                           Log.e(TAG, "通知终端在线成功");
-                                       }
-
-                                       @Override
-                                       public void onFailure(Call<ResponseBody> call, Throwable t) {
-
-                                       }
-                                   });
-                               }
-                           }
-                );
-
     }
 
     /**
@@ -300,7 +234,6 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         String token = Constant.TOKEN;
         String signature = StringUtils.getSignature(time_s, token);
         String deviceid = Constant.MAC;
-//        String device_token = (String) SpUtils.get(Constant.DEVICE_TOKEN, "");
 
         mMainAtyMode.regist(signature, time_s, token, deviceid, new Callback<RegistBean>() {
             @Override
@@ -404,9 +337,6 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
      * @exception/throws
      */
     private void resolveProgram(ProgramBean programBean) {
-//        Gson gson = new Gson();
-//        final ProgramBean programBean = gson.fromJson(jsonStr, ProgramBean.class);
-
         if (programBean == null || programBean.getProgramList().size() == 0) {
             Log.e(TAG, "友盟消息节目单为空");
             return;
@@ -447,7 +377,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
                 //下载资源
                 mDownLoadSubscription = Observable.just(fileUrlList)
-                        .subscribeOn(Schedulers.io())
+                        .subscribeOn(Schedulers.newThread())
                         .flatMap(new Func1<List<String>, Observable<String>>() {
                             @Override
                             public Observable<String> call(List<String> strings) {
@@ -459,8 +389,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                 Log.e(TAG, "下载资源文件完成，准备开始播放节目");
                                 mApplication.setProgramPlay(false);
                                 mMD5Subscription = Observable.interval(1, TimeUnit.SECONDS)
-                                        .subscribeOn(Schedulers.io())
-                                        .observeOn(AndroidSchedulers.mainThread())
+                                        .subscribeOn(Schedulers.newThread())
                                         .subscribe(new Action1<Long>() {
                                             @Override
                                             public void call(Long aLong) {
@@ -577,7 +506,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                             }
                         }
 
-                        if (true) {
+                        if (isBelongCalendar) {
                             //获取播放对象
                             ProgramBean.ProgramListBean programListBean = programListBeens.get(mProgramListBeenIdx);
                             if (programListBean == null) return;
@@ -612,8 +541,8 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
     public void destrory() {
         unsubscribeSub(mProgramSubscription);
         unsubscribeSub(mRigisterSubscription);
-        unsubscribeSub(mPollingTaskSubscription);
-        unsubscribeSub(mPollingOnlineSubscription);
+        unsubscribeSub(mConnSocketSubscription);
+        unsubscribeSub(mReconnSocketSubscription);
     }
 
     /**

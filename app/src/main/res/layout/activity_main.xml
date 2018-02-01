@@ -13,8 +13,21 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
     </FrameLayout>
+
     <TextView
         android:id="@+id/tv_skip_setip"
         android:layout_width="200dp"
         android:layout_height="200dp"/>
+    <ImageView
+        android:id="@+id/img_online"
+        android:layout_width="30dp"
+        android:layout_height="30dp"/>
+    <TextView
+        android:id="@+id/tv_serialnum"
+        android:layout_gravity="right"
+        android:alpha="50"
+        android:textColor="@color/black"
+        android:textSize="10dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
 </FrameLayout>
