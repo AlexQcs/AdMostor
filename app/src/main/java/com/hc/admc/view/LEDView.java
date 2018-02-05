@@ -34,7 +34,7 @@ public class LEDView extends LinearLayout {
 		@Override
 		public void run() {
 			Calendar calendar = Calendar.getInstance(TimeZone
-					.getTimeZone("GMT+8"));
+					.getTimeZone("GMT"));
 			final Date d = new Date();
 			calendar.setTime(d);
 

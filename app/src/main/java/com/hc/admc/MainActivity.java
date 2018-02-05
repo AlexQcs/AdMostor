@@ -168,7 +168,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         mProgramLayout = (FrameLayout) findViewById(R.id.frame_program);
         mAtyLayoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
         mProgramLayout.setLayoutParams(mAtyLayoutParams);
-        mImgOnline.setImageResource(R.mipmap.errline);
+        mImgOnline.setImageResource(R.mipmap.offline);
 
         int width = 500;
         int height = 500;
@@ -202,13 +202,14 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                                     Toast.makeText(mContext, "地址不能为空", Toast.LENGTH_SHORT).show();
                                 } else {
                                     String baseurl = "";
-                                    if (!"".equals(port)) {
-                                        baseurl = url + ":" + port + "/";
-                                    } else {
+                                    if ("".equals(port)) {
                                         baseurl = url + "/";
+                                    } else {
+                                        baseurl = url + ":" + port + "/";
                                     }
                                     SpUtils.put("base_url", baseurl);
-                                    getMvpPresenter().connSocket();
+                                    SpUtils.put(Constant.REGISTERED, false);
+                                    getMvpPresenter().init();
                                 }
                             }
                         })
@@ -259,7 +260,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                     mProgramLayout.addView(imageView);
                     break;
                 case WEBLAYOUT:
-                    WebView webView = new WebView(mContext);
+                    WebView webView = new WebView(getApplicationContext());
                     webView.setLayoutParams(itemParams);
                     mProgramLayout.addView(webView);
                     break;
@@ -388,13 +389,13 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     public void setLineStatus(Message message){
         switch (message.what){
             case 0:
-                mImgOnline.setImageResource(R.mipmap.errline);
+                mImgOnline.setImageResource(R.mipmap.offline);
                 break;
             case 1:
                 mImgOnline.setImageResource(R.mipmap.online);
                 break;
             case 2:
-                mImgOnline.setImageResource(R.mipmap.offline);
+                mImgOnline.setImageResource(R.mipmap.errline);
                 break;
         }
     }
@@ -634,6 +635,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
             String content=textBean.getContent();
             textView.setTextSize(textsize);
             textView.setFocusable(true);
+
             textView.setText(content);
             textView.startMove();
             textView.setOnMoveOver(new CustomTextView.onMoveOver() {

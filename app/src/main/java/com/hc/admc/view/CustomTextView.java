@@ -111,7 +111,7 @@ public class CustomTextView extends View {
             return;
         }
         canvas.save();
-        paint.setColor(Color.BLACK);
+        paint.setColor(Color.RED);
         canvas.drawText(drawingText, 0, drawingText.length(), posX + getWidth(), posY, paint);
         canvas.restore();
 

@@ -40,7 +40,7 @@ public class DateFormatUtils {
      * @return 时间
      */
     public static Date string2Date(String dateStr, String format) {
-        SimpleDateFormat sdf = new SimpleDateFormat(format, Locale.CHINA);
+        SimpleDateFormat sdf = new SimpleDateFormat(format,Locale.CHINA);
         Date date = new Date();
         try {
             date = sdf.parse(dateStr);
@@ -82,7 +82,9 @@ public class DateFormatUtils {
         try {
             Process process = Runtime.getRuntime().exec("su");
             Date resDate = DateFormatUtils.string2Date(date, "yyyy-MM-dd HH:mm:ss");
+//            Log.e("修改系统时间", "对象"+resDate);
             String formatStr = DateFormatUtils.date2String(resDate, "yyyyMMdd.HHmmss");
+            Log.e("修改系统时间", "格式化"+formatStr);
 //            String formatStr = "20170926.103020"; //测试的设置的时间【时间格式 yyyyMMdd.HHmmss】
             DataOutputStream os = new DataOutputStream(process.getOutputStream());
             os.writeBytes("setprop persist.sys.timezone GMT\n");
@@ -90,7 +92,7 @@ public class DateFormatUtils {
             os.writeBytes("clock -w\n");
             os.writeBytes("exit\n");
             os.flush();
-            Log.e("修改系统时间", "成功");
+            Log.e("修改系统时间", "成功"+date);
         } catch (IOException e) {
             e.printStackTrace();
         }

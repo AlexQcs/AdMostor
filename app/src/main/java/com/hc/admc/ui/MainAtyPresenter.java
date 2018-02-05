@@ -21,12 +21,14 @@ import com.hc.admc.util.StringUtils;
 
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_17;
+import org.java_websocket.framing.Framedata;
 import org.java_websocket.handshake.ServerHandshake;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -131,9 +133,6 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
      * 作用:连接WebSocket用于接收节目单推送或者其他消息
      */
     public void connSocket() {
-        if (mSocketClient != null) {
-            mSocketClient.close();
-        }
         if (mConnSocketSubscription != null && !mConnSocketSubscription.isUnsubscribed()) {
             mConnSocketSubscription.unsubscribe();
         }
@@ -191,6 +190,14 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                 public void onClose(int code, String reason, boolean remote) {
                                     Log.e("WebSocketClient", "通道关闭" + reason);
                                     getMvpView().offline();
+                                    mReconnSocketSubscription = Observable.timer(5, TimeUnit.SECONDS).subscribe(
+                                            new Action1<Long>() {
+                                                @Override
+                                                public void call(Long aLong) {
+                                                    connSocket();
+                                                }
+                                            }
+                                    );
                                 }
 
                                 @Override
@@ -210,14 +217,6 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                             mSocketClient.connect();
                         } catch (URISyntaxException e) {
                             getMvpView().errline();
-                            mReconnSocketSubscription = Observable.timer(5, TimeUnit.SECONDS).subscribe(
-                                    new Action1<Long>() {
-                                        @Override
-                                        public void call(Long aLong) {
-                                            connSocket();
-                                        }
-                                    }
-                            );
                             e.printStackTrace();
                         }
                     }
@@ -408,6 +407,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                                         return;
                                                     }
                                                 }
+                                                if (mItemMD5Map.size() == 0) isDone = true;
                                                 if (isDone) {
                                                     //当md5校验全部通过时通知服务器以及播放节目
                                                     sysncFinish();
@@ -576,5 +576,18 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         SpUtils.put(Constant.REGISTERED, mRegistered);
     }
 
+
+    public String parseFramedata(Framedata framedata) {
+        String result = "null";
+        ByteBuffer buffer = framedata.getPayloadData();
+        if (null == buffer) {
+            return result;
+        }
+        byte[] data = buffer.array();
+        if (null != data && data.length > 0) {
+            return new String(data);
+        }
+        return result;
+    }
 
 }
