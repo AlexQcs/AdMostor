@@ -265,10 +265,16 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
                 try {
-                    String date = response.body().string().replace("\"", "");
-                    //利用adb指令修改系统时间
-                    DateFormatUtils.syncTime(date);
-                    Log.e(TAG, "时间同步" + date);
+                    String date = response.body().string();
+                    if (date==null||"".equals(date)){
+                        Log.e(TAG, "onResponse: 同步时间请求出错" );
+                    }else {
+                        date = date.replace("\"", "");
+                        //利用adb指令修改系统时间
+                        DateFormatUtils.syncTime(date);
+                        Log.e(TAG, "时间同步" + date);
+                    }
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
