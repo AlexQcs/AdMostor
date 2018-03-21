@@ -8,7 +8,6 @@ import java.util.List;
 
 /**
  * Activity的管理类
- * 单例模式---懒汉式
  */
 
 public class ActivityCollector {

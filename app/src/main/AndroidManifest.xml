@@ -44,6 +44,11 @@
         <activity android:name=".SetUrlActivity">
 
         </activity>
+        <service
+            android:name=".service.PlayingMusicServices"
+            android:enabled="true"
+            android:exported="true"
+            />
     </application>
 
 </manifest>

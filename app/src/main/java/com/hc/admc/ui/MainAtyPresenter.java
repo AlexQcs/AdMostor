@@ -118,9 +118,10 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
         } else {
             Gson gson = new Gson();
             programBean = gson.fromJson(programStr, ProgramBean.class);
+            //播放节目单
+            playProgram(programBean.getProgramList());
         }
-        //播放节目单
-        playProgram(programBean.getProgramList());
+
         //链接WebSocket
         connSocket();
         //轮询服务器接口
@@ -149,6 +150,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                     @Override
                     public void call(String url) {
                         try {
+                            //实例化websocket
                             mSocketClient = new WebSocketClient(new URI(url), new Draft_17()) {
                                 @Override
                                 public void onOpen(ServerHandshake handshakedata) {
@@ -171,17 +173,66 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
                                         case 1001:
                                             Log.e(TAG, "关机消息");
+//                                            Intent intent=new Intent("android.intent.action.shotdown");
+                                            getMvpView().shutdown();
                                             //关机
                                             break;
                                         case 1002:
-                                            Log.e(TAG, "关机消息");
+                                            Log.e(TAG, "重启消息");
+                                            getMvpView().reboot();
                                             break;
 
                                         case 10003:
+                                            Log.e(TAG, "播放节目消息");
                                             Map<String, String> data = pushBean.getData();
                                             String url = data.get("url");
                                             String id = data.get("taskId");
                                             requestProgram(url, id);
+                                            break;
+
+                                        case 10004:
+                                            Log.e(TAG, "设置时间");
+                                            getMvpView().settime();
+                                            break;
+                                        case 10005:
+                                            Log.e(TAG, "隐藏导航栏");
+                                            getMvpView().hidebar();
+                                            break;
+                                        case 10006:
+                                            Log.e(TAG, "显示导航栏");
+                                            getMvpView().showbar();
+                                            break;
+                                        case 10007:
+                                            Log.e(TAG, "恢复出厂");
+                                            getMvpView().recovery();
+                                            break;
+                                        case 10008:
+                                            Log.e(TAG, "定时开关机");
+                                            Map<String, String> time = pushBean.getData();
+                                            String timeon = time.get("timeon");
+                                            String timeoff = time.get("timeoff");
+                                            String enableStr=time.get("setTimeOffAndOn");
+                                            boolean enable=false;
+                                            if ("true".equals(enableStr))enable=true;
+                                            getMvpView().setpoweronoff(timeon, timeoff,enable);
+                                        case 1009:
+                                            Log.e(TAG, "截屏");
+                                            getMvpView().screenshot();
+                                            break;
+                                        case 1010:
+                                            Log.e(TAG, "开关背光");
+                                            Map<String, String> backLight = pushBean.getData();
+                                            String isOnStr=backLight.get("isOffAndOn");
+                                            boolean isOn=false;
+                                            if ("true".equals(isOnStr))isOn=true;
+                                            getMvpView().backlight(isOn);
+                                            break;
+                                        case 1011:
+                                            Log.e(TAG, "设置音量");
+                                            Map<String, String> volData = pushBean.getData();
+                                            String volumeStr = volData.get("volume");
+                                            int volume = Integer.parseInt(volumeStr);
+                                            getMvpView().setvolume(volume);
                                             break;
                                     }
                                 }
@@ -266,9 +317,9 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
                 try {
                     String date = response.body().string();
-                    if (date==null||"".equals(date)){
-                        Log.e(TAG, "onResponse: 同步时间请求出错" );
-                    }else {
+                    if (date == null || "".equals(date)) {
+                        Log.e(TAG, "onResponse: 同步时间请求出错");
+                    } else {
                         date = date.replace("\"", "");
                         //利用adb指令修改系统时间
                         DateFormatUtils.syncTime(date);
@@ -367,7 +418,8 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                         String id = itemBean.getItemId();
                         String content = itemBean.getContent();
                         String[] tempArray = id.split("_");
-                        if ("image".equals(tempArray[0]) || "video".equals(tempArray[0])) {
+                        //只有当节目类型为图片、视频、音乐时才下载文件
+                        if ("image".equals(tempArray[0]) || "video".equals(tempArray[0]) || "audio".equals(tempArray[0])) {
                             mItemMD5Map.put(itemBean.getPath(), content);
                         }
                     }
@@ -395,6 +447,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                 mApplication.setProgramPlay(false);
                                 mMD5Subscription = Observable.interval(1, TimeUnit.SECONDS)
                                         .subscribeOn(Schedulers.newThread())
+                                        .observeOn(AndroidSchedulers.mainThread())
                                         .subscribe(new Action1<Long>() {
                                             @Override
                                             public void call(Long aLong) {
@@ -409,6 +462,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                                     File file = new File(path);
                                                     isDone = MD5.decode(file, md5);
                                                     if (!isDone) {
+                                                        getMvpView().downloadNow();
                                                         Log.e(TAG, "下载节目未完成");
                                                         return;
                                                     }
@@ -416,6 +470,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                                                 if (mItemMD5Map.size() == 0) isDone = true;
                                                 if (isDone) {
                                                     //当md5校验全部通过时通知服务器以及播放节目
+                                                    getMvpView().downloadNot();
                                                     sysncFinish();
                                                     playProgram(mProgramListBeens);
                                                 }
@@ -426,6 +481,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
                             @Override
                             public void onError(Throwable e) {
+                                getMvpView().downloadErr();
                                 e.printStackTrace();
                             }
 
@@ -475,6 +531,40 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
      *         节目列表
      */
     private void playProgram(final List<ProgramBean.ProgramListBean> programListBeens) {
+
+        HashMap<String, String> itemMD5Map = new HashMap<>();
+
+        for (ProgramBean.ProgramListBean been : programListBeens) {
+            List<String> fileList = been.getResource();
+            List<ProgramBean.ProgramListBean.MatItemBean> matItemBeens = been.getMatItem();
+            for (ProgramBean.ProgramListBean.MatItemBean itemBean : matItemBeens) {
+                //获取资源md5列表
+                String id = itemBean.getItemId();
+                String content = itemBean.getContent();
+                String[] tempArray = id.split("_");
+                //只有当节目类型为图片、视频、音乐时才记录MD5值
+                if ("image".equals(tempArray[0]) || "video".equals(tempArray[0]) || "audio".equals(tempArray[0])) {
+                    itemMD5Map.put(itemBean.getPath(), content);
+                }
+            }
+        }
+
+        Iterator iter = itemMD5Map.entrySet().iterator();
+        //验证MD5
+        while (iter.hasNext()) {
+            Map.Entry entry = (Map.Entry) iter.next();
+            String path = (String) entry.getKey();
+            String md5 = (String) entry.getValue();
+            path = Constant.LOCAL_PROGRAM_PATH + File.separator + path;
+            File file = new File(path);
+            boolean isCompleteness = MD5.decode(file, md5);
+            if (!isCompleteness) {
+                file.delete();
+                Log.e(TAG, "下载节目未完成");
+                return;
+            }
+        }
+
         Log.e(TAG, "播放新节目");
         if (mMD5Subscription != null && !mMD5Subscription.isUnsubscribed()) {
             mMD5Subscription.unsubscribe();
@@ -531,7 +621,6 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
                 });
     }
 
-
     /**
      * 作用:解除订阅
      *
@@ -545,6 +634,7 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
     }
 
     public void destrory() {
+        //当activity被销毁时取消订阅
         unsubscribeSub(mProgramSubscription);
         unsubscribeSub(mRigisterSubscription);
         unsubscribeSub(mConnSocketSubscription);
@@ -575,7 +665,6 @@ public class MainAtyPresenter extends BaseMvpPresenter<MainView> {
 
     private void getShareprefrence() {
         mRegistered = (boolean) SpUtils.get(Constant.REGISTERED, false);
-
     }
 
     private void saveShareprefrence() {

@@ -2,9 +2,13 @@ package com.hc.admc;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Point;
@@ -16,9 +20,11 @@ import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
+import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.util.Log;
 import android.view.Display;
@@ -49,13 +55,17 @@ import com.hc.admc.base.ActivityCollector;
 import com.hc.admc.base.OnPermissionCallbackListener;
 import com.hc.admc.bean.program.ProgramBean;
 import com.hc.admc.bean.program.TextBean;
+import com.hc.admc.service.PlayingMusicServices;
 import com.hc.admc.ui.MainAtyPresenter;
 import com.hc.admc.ui.MainView;
+import com.hc.admc.util.DateFormatUtils;
 import com.hc.admc.util.FieldView;
 import com.hc.admc.util.FileUtils;
 import com.hc.admc.util.GlideCacheUtil;
+import com.hc.admc.util.MemInfo;
 import com.hc.admc.util.SpUtils;
 import com.hc.admc.util.ViewFind;
+import com.hc.admc.util.VolumeUtils;
 import com.hc.admc.view.CustomTextView;
 import com.hc.admc.view.LEDView;
 
@@ -63,6 +73,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -75,12 +87,24 @@ import rx.Subscription;
 @CreatePresenter(MainAtyPresenter.class)
 public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresenter> implements MainView {
 
+
     private static final String TAG = "MainActivity";
+    /**
+     * 节目类型的标识
+     */
     private static final String VIDEOLAYOUT = "video";
     private static final String IMAGELAYOUT = "image";
     private static final String WEBLAYOUT = "url";
     private static final String TEXTLAYOUT = "text";
     private static final String CLOCKLAYOUT = "clock";
+    private static final String MUSICLAYOUT = "audio";
+
+    /**
+     * 规定开始音乐、暂停音乐、结束音乐的标志
+     */
+    public static final int PLAY_MUSIC = 1;
+    public static final int PAUSE_MUSIC = 2;
+    public static final int STOP_MUSIC = 3;
 
 
 //    @FieldView(R.id.webview)
@@ -92,9 +116,15 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     private TextView mTvSerialNum;
     @FieldView(R.id.img_online)
     private ImageView mImgOnline;
+    @FieldView(R.id.img_download)
+    private ImageView mImgDownload;
+    @FieldView(R.id.tv_memory_remind)
+    private TextView mTvMemoryRemind;
+
 
     private EditText mEtvUrl;
     private EditText mEtvPort;
+    private TextView mTvDialogSerial;
 
     private Context mContext = MainActivity.this;
 
@@ -117,6 +147,22 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     private Subscription mSubscriImageTimer;
 
     private MediaPlayer mMediaPlayer;
+    private int mMusicListIdx = 0;
+    private PlayingMusicServices mMusicServices;
+    private BroadcastReceiver mMusicBroadcast;
+    private ArrayList<String> mMusicPathList;
+    private String mMusicItemId;
+    private ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            mMusicServices = ((PlayingMusicServices.MusicBinder) service).getService();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mMusicServices = null;
+        }
+    };
 
     private ImageHandler mImageHandler;
 
@@ -125,8 +171,13 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     private boolean mIsDestroy;
     private Map<String, MediaPlayer> mPlayerMap;
 
-    private final Handler mLineStatusHandler=new LineStatusHandler(this);
+    private boolean isMusicBind;//判断音乐服务是否开启
 
+    private final Handler mLineStatusHandler = new LineStatusHandler(this);
+
+    private final Handler mDownloadHandler = new DownLoadStatusHandler(this);
+
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -139,7 +190,14 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         initEvent();
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
     void initData() {
+        if (MemInfo.getAvailableSize() < 500) {
+            FileUtils.delAllFile(Constant.LOCAL_FILE_PATH);
+            mTvMemoryRemind.setVisibility(View.VISIBLE);
+        } else {
+            mTvMemoryRemind.setVisibility(View.GONE);
+        }
         mActivityCollector = ActivityCollector.getInstance();
         mActivityCollector.addActivity(this);
         if (Build.VERSION.SDK_INT >= 23) {
@@ -151,6 +209,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         mItemMD5 = new HashMap<>();
         mItemResList = new HashMap<>();
         mPlayerMap = new HashMap<>();
+        mMusicPathList = new ArrayList<>();
 
         mImageHandler = new ImageHandler(this);
 
@@ -189,6 +248,8 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                 View view = inflater.inflate(R.layout.dialog_baseurl, null);
                 mEtvUrl = (EditText) view.findViewById(R.id.edit_url);
                 mEtvPort = (EditText) view.findViewById(R.id.edit_port);
+                mTvDialogSerial = (TextView) view.findViewById(R.id.tv_serialnum_dialog);
+                mTvDialogSerial.setText("设备标识码:" + Constant.getSerialNumber());
                 mEtvUrl.setHintTextColor(Color.GRAY);
                 mEtvPort.setHintTextColor(Color.GRAY);
                 builder.setView(view)
@@ -217,6 +278,12 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                 builder.create().show();
             }
         });
+
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(PlayingMusicServices.ACT_MUSIC_COMPLETE);
+
+        mMusicBroadcast = new PlayMusicBroadCast();
+        registerReceiver(mMusicBroadcast, intentFilter);
     }
 
     @Override
@@ -234,6 +301,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         mItemIndexMap.clear();
         mItemResList.clear();
         mPlayerMap.clear();
+        playingmusic(STOP_MUSIC);
         Message message = new Message();
         message.what = 1;
         mImageHandler.sendMessage(message);
@@ -276,6 +344,11 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                     ledView.setLayoutParams(itemParams);
                     mProgramLayout.addView(ledView);
                     break;
+                case MUSICLAYOUT:
+                    View musicView = new View(mContext);
+                    musicView.setLayoutParams(itemParams);
+                    mProgramLayout.addView(musicView);
+                    break;
             }
             mItemIndexMap.put(item.getId(), 0);
             mItemIDList.add(item.getId());
@@ -302,7 +375,7 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
             for (ProgramBean.ProgramListBean.MatItemBean matItem : matItemBeens) {
                 if (itemid.equals(matItem.getItemId())) {
                     String[] tempArray = itemid.split("_");
-                    if ("video".equals(tempArray[0]) || "image".equals(tempArray[0])) {
+                    if ("video".equals(tempArray[0]) || "image".equals(tempArray[0]) || "audio".equals(tempArray[0])) {
                         pathList.add(matItem.getPath());
                     } else {
                         pathList.add(matItem.getContent());
@@ -344,6 +417,14 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
                         case "clock":
                             playClock(i);
                             break;
+                        case "audio":
+                            mMusicPathList.clear();
+                            mMusicPathList = (ArrayList<String>) pathList.clone();
+                            mMusicItemId = itemid;
+//                            playingmusic(STOP_MUSIC);
+//                            playMusic();
+                            playingmusic(PLAY_MUSIC);
+                            break;
                     }
                 }
             }
@@ -371,23 +452,154 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         mLineStatusHandler.sendMessage(message);
     }
 
-    static class LineStatusHandler extends Handler{
+    @Override
+    public void downloadNot() {
+        Message message = new Message();
+        message.what = 0;
+        mDownloadHandler.sendMessage(message);
+    }
+
+    @Override
+    public void downloadNow() {
+        Message message = new Message();
+        message.what = 1;
+        mDownloadHandler.sendMessage(message);
+    }
+
+    @Override
+    public void downloadErr() {
+        Message message = new Message();
+        message.what = 2;
+        mDownloadHandler.sendMessage(message);
+    }
+
+    @Override
+    public void setpoweronoff(String timeonStr, String timeoffStr, boolean enable) {
+        Intent intent = new Intent("android.intent.setpoweronoff");
+
+        Date dateOn = DateFormatUtils.string2Date(timeonStr, "yyyy-MM-dd hh:mm:ss");
+        Date dateOff = DateFormatUtils.string2Date(timeoffStr, "yyyy-MM-dd hh:mm:ss");
+
+        Calendar calendarOn = Calendar.getInstance();
+        calendarOn.setTime(dateOn);
+        Calendar calendarOff = Calendar.getInstance();
+        calendarOff.setTime(dateOff);
+
+        int yearOn=calendarOn.get(Calendar.YEAR);
+        int monthOn=calendarOn.get(Calendar.MONTH);
+        int dayOn=calendarOn.get(Calendar.DATE);
+        int hourOn=calendarOn.get(Calendar.HOUR_OF_DAY);
+        int minuteOn=calendarOn.get(Calendar.MINUTE);
+        int secondOn=calendarOn.get(Calendar.SECOND);
+
+        int yearOff=calendarOff.get(Calendar.YEAR);
+        int monthOff=calendarOff.get(Calendar.MONTH);
+        int dayOff=calendarOff.get(Calendar.DATE);
+        int hourOff=calendarOff.get(Calendar.HOUR_OF_DAY);
+        int minuteOff=calendarOff.get(Calendar.MINUTE);
+        int secondOff=calendarOff.get(Calendar.SECOND);
+
+        int[] timeon = new int[]{2015, 07, 14, 8, 30, 0};//开机时间
+        intent.putExtra("timeon", timeon);
+        int[] timeoff = new int[]{2015, 07, 14, 18, 0, 0};//关机时间
+        intent.putExtra("timeoff", timeoff);
+        intent.putExtra("enable", enable);//true为启用,false为取消此功能
+        sendBroadcast(intent);
+    }
+
+    @Override
+    public void settime() {
+//        Intent intent = new Intent("android.intent.action.settime");
+//        int[] settime = new int[]{2015, 01, 14, 18, 0, 0};
+//        intent.putExtra("settime", settime);
+//        sendBroadcast(intent);
+    }
+
+    @Override
+    public void shutdown() {
+        Intent intent = new Intent("android.intent.action.shutdown");
+        sendBroadcast(intent);
+    }
+
+    @Override
+    public void reboot() {
+        Intent intent = new Intent("android.intent.action.reboot");
+        sendBroadcast(intent);
+    }
+
+    @Override
+    public void backlight(boolean isOn) {
+        Intent intent = new Intent("android.yide.ointent.action.backlight");
+        intent.putExtra("enable", isOn);
+        sendBroadcast(intent);
+    }
+
+    @Override
+    public void setvolume(int volume) {
+        VolumeUtils.setVolum(volume);
+    }
+
+
+    @Override
+    public void hidebar() {
+        Intent intent = new Intent("android.intent.action.hidebar");
+        sendBroadcast(intent);
+    }
+
+    @Override
+    public void showbar() {
+        Intent intent = new Intent("android.intent.action.showbar");
+        sendBroadcast(intent);
+    }
+
+    @Override
+    public void recovery() {
+        Intent intent = new Intent("android.yide.intent.action.recovery");
+        intent.putExtra("enable", false);//确认恢复true 取消恢复false
+        sendBroadcast(intent);
+    }
+
+    @Override
+    public void screenshot() {
+        Intent intent = new Intent("rk.android.screenshot.action");
+        //图片保存路径,/mnt/sdcard/Screenshots,文件名按时间保存例如Screenshot_2011-01-01-20-00-58.png
+        sendBroadcast(intent);
+    }
+
+    static class LineStatusHandler extends Handler {
         private final WeakReference<MainActivity> mActivity;
-        public LineStatusHandler(MainActivity mainActivity){
-            mActivity=new WeakReference<MainActivity>(mainActivity);
+
+        public LineStatusHandler(MainActivity mainActivity) {
+            mActivity = new WeakReference<MainActivity>(mainActivity);
         }
 
         @Override
         public void handleMessage(Message msg) {
-            if (mActivity.get()==null){
+            if (mActivity.get() == null) {
                 return;
             }
             mActivity.get().setLineStatus(msg);
         }
     }
 
-    public void setLineStatus(Message message){
-        switch (message.what){
+    static class DownLoadStatusHandler extends Handler {
+        private final WeakReference<MainActivity> mActivity;
+
+        public DownLoadStatusHandler(MainActivity mainActivity) {
+            mActivity = new WeakReference<MainActivity>(mainActivity);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            if (mActivity.get() == null) {
+                return;
+            }
+            mActivity.get().setDownloadStatus(msg);
+        }
+    }
+
+    public void setLineStatus(Message message) {
+        switch (message.what) {
             case 0:
                 mImgOnline.setImageResource(R.mipmap.offline);
                 break;
@@ -400,6 +612,20 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         }
     }
 
+    public void setDownloadStatus(Message message) {
+        switch (message.what) {
+            case 0:
+                mImgDownload.setImageResource(R.mipmap.download_not);
+                break;
+            case 1:
+                mImgDownload.setImageResource(R.mipmap.download_now);
+                break;
+            case 2:
+                mImgDownload.setImageResource(R.mipmap.download_err);
+                break;
+        }
+    }
+
     private void playVideo(final ArrayList<String> pathList, final String itemid, final int childViewIndex) {
 
         FrameLayout frameLayout = (FrameLayout) mProgramLayout.getChildAt(childViewIndex);
@@ -408,7 +634,6 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         } else {
             playVideo(frameLayout, pathList, itemid);
         }
-
     }
 
     private void playVideo(FrameLayout frameLayout, final ArrayList<String> pathList, final String itemid) {
@@ -629,10 +854,10 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         if (contentList == null || contentList.size() == 0) {
             Log.e(TAG, "网页列表为空");
         } else {
-            Gson gson=new Gson();
-            TextBean textBean=gson.fromJson(contentList.get(mItemIndexMap.get(itemid)),TextBean.class);
-            int textsize=textBean.getFontSize();
-            String content=textBean.getContent();
+            Gson gson = new Gson();
+            TextBean textBean = gson.fromJson(contentList.get(mItemIndexMap.get(itemid)), TextBean.class);
+            int textsize = textBean.getFontSize();
+            String content = textBean.getContent();
             textView.setTextSize(textsize);
             textView.setFocusable(true);
 
@@ -665,6 +890,44 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
         ledView.start();
     }
 
+
+    private void playingmusic(int type) {
+        //启动服务，播放音乐
+
+//        ArrayList<String> pathList=new ArrayList<>();
+//        String musicPath = Environment.getExternalStorageDirectory() + "/Pictures/wujiu.mp3";
+
+        if (mMusicPathList == null || mMusicPathList.size() == 0) {
+            Log.e(TAG, "音乐数组为空");
+            return;
+        }
+
+        Intent intent = new Intent(this, PlayingMusicServices.class);
+        intent.putExtra("type", type);
+        if (type == PLAY_MUSIC) {
+            mMusicListIdx++;
+            if (mMusicListIdx >= mMusicPathList.size()) {
+                mMusicListIdx = 0;
+            }
+            String musicPath = Constant.LOCAL_PROGRAM_PATH + File.separator + mMusicPathList.get(mItemIndexMap.get(mMusicItemId));
+            intent.putExtra("path", musicPath);
+            mItemIndexMap.put(mMusicItemId, mMusicListIdx);
+        }
+
+        startService(intent);
+        isMusicBind = bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    private class PlayMusicBroadCast extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(PlayingMusicServices.ACT_MUSIC_COMPLETE)) {
+                playingmusic(PLAY_MUSIC);
+            }
+        }
+    }
+
     @Override
     protected void onStop() {
         super.onStop();
@@ -677,6 +940,13 @@ public class MainActivity extends AbstractMvpActivitiy<MainView, MainAtyPresente
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        if (mConnection != null && isMusicBind) {
+            unbindService(mConnection);
+        }
+        Intent intent = new Intent(this, PlayingMusicServices.class);
+        stopService(intent);
+        unregisterReceiver(mMusicBroadcast);
 
         Message message = new Message();
         message.what = 1;

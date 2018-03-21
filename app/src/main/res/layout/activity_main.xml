@@ -22,12 +22,27 @@
         android:id="@+id/img_online"
         android:layout_width="30dp"
         android:layout_height="30dp"/>
+    <ImageView
+        android:id="@+id/img_download"
+        android:src="@mipmap/download_not"
+        android:layout_marginLeft="40dp"
+        android:layout_width="30dp"
+        android:layout_height="30dp"/>
     <TextView
         android:id="@+id/tv_serialnum"
         android:layout_gravity="right"
         android:alpha="50"
         android:textColor="@color/black"
         android:textSize="10dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+    <TextView
+        android:id="@+id/tv_memory_remind"
+        android:textColor="@color/crimson"
+        android:textSize="30sp"
+        android:textStyle="bold"
+        android:text="内存不足，已删除全部节目，请重新启动程序并重新下发节目!"
+        android:visibility="gone"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 </FrameLayout>
